@@ -5,8 +5,8 @@ import functions
 import os
 import base64
 
-mail_pass = "sbYxeqDjrRzKtd0AL7gM"
-username = "mail_python@mail.ru"
+mail_pass = ""
+username = ""
 imap_server = "imap.mail.ru"
 imap = imaplib.IMAP4_SSL(imap_server)
 imap.login(username, mail_pass)
