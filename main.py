@@ -4,6 +4,7 @@ from email.header import decode_header
 import functions
 import os
 import base64
+from os import getenv
 
 mail_pass = ""
 username = ""
