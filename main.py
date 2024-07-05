@@ -5,9 +5,9 @@ import functions
 import os
 import base64
 from os import getenv
+from dotenv import load_dotenv
 
-mail_pass = ""
-username = ""
+
 imap_server = "imap.mail.ru"
 imap = imaplib.IMAP4_SSL(imap_server)
 imap.login(username, mail_pass)
@@ -18,6 +18,10 @@ ENCODING = "utf-8"
 
 
 def main():
+    load_dotenv()
+    mail_pass = getenv("MAILPASS")
+    username = getenv("USERNAME")
+    
     res, unseen_msg = imap.uid("search", "UNSEEN", "ALL")
     unseen_msg = unseen_msg[0].decode(ENCODING).split(" ")
 
