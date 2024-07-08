@@ -1,31 +1,32 @@
-
 from email.header import decode_header
 import base64
 from bs4 import BeautifulSoup
-
-import asyncio
 import quopri
+import email
+import os
 
 
-
+ENCODING = "utf-8"
+DOCX_FILETYPE = 'vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 
 def from_subj_decode(msg_from_subj):
-    if msg_from_subj:
-        encoding = decode_header(msg_from_subj)[0][1]
-        msg_from_subj = decode_header(msg_from_subj)[0][0]
-        if isinstance(msg_from_subj, bytes):
-            msg_from_subj = msg_from_subj.decode(encoding)
-        if isinstance(msg_from_subj, str):
-            pass
-        msg_from_subj = str(msg_from_subj).strip("<>").replace("<", "")
-        return msg_from_subj
-    else:
+    if not msg_from_subj:
         return None
+    encoding = decode_header(msg_from_subj)[0][1]
+    msg_from_subj = decode_header(msg_from_subj)[0][0]
+    if isinstance(msg_from_subj, bytes):
+        msg_from_subj = msg_from_subj.decode(encoding)
+    if isinstance(msg_from_subj, str):
+        pass
+    msg_from_subj = str(msg_from_subj).strip("<>").replace("<", "")
+    return msg_from_subj
 
 
 def get_letter_text_from_html(body):
-    body = body.replace("<div><div>", "<div>").replace("</div></div>", "</div>")
+    body = body.replace(
+        "<div><div>", "<div>"
+    ).replace("</div></div>", "</div>")
     try:
         soup = BeautifulSoup(body, "html.parser")
         paragraphs = soup.find_all("div")
@@ -34,7 +35,7 @@ def get_letter_text_from_html(body):
             text += paragraph.text + "\n"
         return text.replace("\xa0", " ")
     except (Exception) as exp:
-        print("text ftom html err ", exp)
+        print("function \"get_letter_text_from_html\" made error ", exp)
         return False
 
 
@@ -47,31 +48,106 @@ def letter_type(part):
     elif part["Content-Transfer-Encoding"] == "quoted-printable":
         encoding = part.get_content_charset()
         return quopri.decodestring(part.get_payload()).decode(encoding)
-    else:  # all possible types: quoted-printable, base64, 7bit, 8bit, and binary
+    else:
         return part.get_payload()
+
+
+def clean_text(text):
+    return text.replace("<", "").replace(">", "").replace("\xa0", " ").strip()
+
+
+def extract_text_from_part(part):
+    extract_part = letter_type(part)
+    if part.get_content_subtype() == "html":
+        return get_letter_text_from_html(extract_part)
+    return extract_part
 
 
 def get_letter_text(msg):
     if msg.is_multipart():
         for part in msg.walk():
-            count = 0
-            if part.get_content_maintype() == "text" and count == 0:
-                extract_part = letter_type(part)
-                if part.get_content_subtype() == "html":
-                    letter_text = get_letter_text_from_html(extract_part)
-                else:
-                    letter_text = extract_part.rstrip().lstrip()
-                count += 1
-                return (
-                    letter_text.replace("<", "").replace(">", "").replace("\xa0", " ")
-                )
+            if part.get_content_maintype() == "text":
+                return clean_text(extract_text_from_part(part))
     else:
-        count = 0
-        if msg.get_content_maintype() == "text" and count == 0:
-            extract_part = letter_type(msg)
-            if msg.get_content_subtype() == "html":
-                letter_text = get_letter_text_from_html(extract_part)
-            else:
-                letter_text = extract_part
-            count += 1
-            return letter_text.replace("<", "").replace(">", "").replace("\xa0", " ")
+        if msg.get_content_maintype() == "text":
+            return clean_text(extract_text_from_part(msg))
+    return ""
+
+
+def get_letter_files(msg):
+    mail = email.message_from_bytes(msg[0][1])
+
+    if mail.is_multipart():
+        if not os.path.exists("files"):
+            os.mkdir("files")
+        for part in mail.walk():
+            content_type = part.get_content_type()
+            filename = part.get_filename()
+
+            if not filename:
+                continue
+            filename = str(filename).split('?')[3].encode(
+                filename.split('?')[1]
+            )
+            filetype = content_type.split("/")[1]
+            if filetype == DOCX_FILETYPE:
+                filetype = "docx"
+            new_file = os.path.join(
+                "files",
+                str(filename).split('\'')[1] + '.' + filetype
+            )
+
+            with open(new_file, 'wb') as new_file:
+                new_file.write(part.get_payload(decode=True))
+                new_file.close()
+
+
+def return_all_unread_messages(imap):
+    """
+    Returns unread messages
+    :param imap: imaplib.IMAP4_SSL(imap_server)
+    :return:
+    """
+    letters_massive = []
+
+    res, unseen_msg = imap.uid("search", "UNSEEN", "ALL")
+    unseen_msg = unseen_msg[0].decode(ENCODING).split(" ")
+
+    if not unseen_msg[0]:
+        return letters_massive
+
+    for letter in unseen_msg:
+        res, msg = imap.uid("fetch", letter, "(RFC822)")
+        if res != "OK":
+            continue
+        msg = email.message_from_bytes(msg[0][1])
+        msg_from = from_subj_decode(msg["From"])
+        msg_subj = from_subj_decode(msg["Subject"])
+        msg_date = msg["Date"]
+
+        if msg["Message-ID"]:
+            msg_id = msg["Message-ID"].lstrip("<").rstrip(">")
+        else:
+            msg_id = msg["Received"]
+
+        if msg["Return-path"]:
+            msg_from = msg["Return-path"].lstrip("<").rstrip(">")
+        if not msg_from:
+            encoding = decode_header(msg["From"])[0][1]  # не проверено
+            msg_from = (
+                decode_header(msg["From"])[1][0].decode(
+                    encoding
+                ).replace("<", "").replace(">", "").replace(" ", "")
+            )
+        letter_text = get_letter_text(msg)
+        letters_massive.append(
+            [
+                msg_subj,
+                letter_text,
+                msg_from,
+                msg_date,
+                msg_id
+            ]
+        )
+
+    return letters_massive
