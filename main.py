@@ -1,8 +1,5 @@
-import imaplib
-import email_functions
 from os import getenv
 from dotenv import load_dotenv
-import email_functions
 import email_class
 
 
