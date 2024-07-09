@@ -143,13 +143,13 @@ class Mail:
                 )
             letter_text = self.get_letter_text(msg)
             letters_massive.append(
-                [
-                    msg_subj,
-                    letter_text,
-                    msg_from,
-                    msg_date,
-                    msg_id
-                ]
+                {
+                    "Subject": msg_subj,
+                    "Text": letter_text,
+                    "Sender": msg_from,
+                    "Date": msg_date,
+                    "Id": msg_id
+                }
             )
 
         return letters_massive
