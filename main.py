@@ -1,7 +1,9 @@
 import imaplib
-import functions
+import email_functions
 from os import getenv
 from dotenv import load_dotenv
+import email_functions
+import email_class
 
 
 def main():
@@ -9,14 +11,11 @@ def main():
     mail_pass = getenv("MAILPASS")
     mail_username = getenv("MAILUSERNAME")
 
-    imap_server = "imap.mail.ru"
-    imap = imaplib.IMAP4_SSL(imap_server)
-    imap.login(mail_username, mail_pass)
-    imap.select("INBOX")
+    mail_class = email_class.Mail(mail_username, mail_pass)
 
-    msgs = functions.return_all_unread_messages(imap)
+    msgs = mail_class.return_all_unread_messages()
     for msg in msgs:
-        print(msg[1])
+        print(msg["Text"])
 
 
 if __name__ == "__main__":
