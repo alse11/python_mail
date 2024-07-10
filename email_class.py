@@ -104,10 +104,10 @@ class Mail:
                     new_file.write(part.get_payload(decode=True))
                     new_file.close()
 
-    def return_all_unread_messages(self):
+    def return_all_unread_messages(self, sender=None):
         """
         Returns unread messages
-        :param imap: imaplib.IMAP4_SSL(imap_server)
+        :param sender: target email
         :return:
         """
         letters_massive = []
@@ -142,6 +142,9 @@ class Mail:
                     ).replace("<", "").replace(">", "").replace(" ", "")
                 )
             letter_text = self.get_letter_text(msg)
+            if msg_from != sender and sender != None:
+                continue
+
             letters_massive.append(
                 {
                     "Subject": msg_subj,
