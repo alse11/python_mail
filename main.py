@@ -10,9 +10,9 @@ def main():
 
     mail_class = email_class.Mail(mail_username, mail_pass)
 
-    msgs = mail_class.return_all_unread_messages()
+    msgs = mail_class.return_all_unread_messages("target_mail@gmail.com")
     for msg in msgs:
-        print(msg["Text"])
+        print(msg["Sender"])
 
 
 if __name__ == "__main__":
