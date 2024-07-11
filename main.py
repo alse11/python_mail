@@ -2,7 +2,6 @@ from os import getenv
 from dotenv import load_dotenv
 import email_class
 
-
 def main():
     load_dotenv()
     mail_pass = getenv("MAILPASS")
@@ -10,9 +9,11 @@ def main():
 
     mail_class = email_class.Mail(mail_username, mail_pass)
 
-    msgs = mail_class.return_all_unread_messages("target_mail@gmail.com")
+    mail_class.get_letter_files_from_id(5)
+
+    msgs = mail_class.return_all_unread_messages()
     for msg in msgs:
-        print(msg["Sender"])
+        print(msg["Id"])
 
 
 if __name__ == "__main__":
