@@ -7,7 +7,6 @@ import email
 import os
 import email_constance
 
-
 class Mail:
 
     def __init__(self, username, password):
@@ -18,6 +17,7 @@ class Mail:
         self.imap = imaplib.IMAP4_SSL(imap_server)
         self.imap.login(self.mail_username, self.mail_pass)
         self.imap.select("INBOX")
+
 
     def from_subj_decode(self, msg_from_subj):
         if not msg_from_subj:
@@ -30,6 +30,7 @@ class Mail:
             pass
         msg_from_subj = str(msg_from_subj).strip("<>").replace("<", "")
         return msg_from_subj
+
 
     def get_letter_text_from_html(self, body):
         body = body.replace(
@@ -46,6 +47,7 @@ class Mail:
             print("function \"get_letter_text_from_html\" made error ", exp)
             return False
 
+
     def letter_type(self, part):
         if part["Content-Transfer-Encoding"] in (None, "7bit", "8bit", "binary"):
             return part.get_payload()
@@ -58,14 +60,17 @@ class Mail:
         else:
             return part.get_payload()
 
+
     def clean_text(self, text):
         return text.replace("<", "").replace(">", "").replace("\xa0", " ").strip()
+
 
     def extract_text_from_part(self, part):
         extract_part = self.letter_type(part)
         if part.get_content_subtype() == "html":
             return self.get_letter_text_from_html(extract_part)
         return extract_part
+
 
     def get_letter_text(self, msg):
         if msg.is_multipart():
@@ -76,6 +81,7 @@ class Mail:
             if msg.get_content_maintype() == "text":
                 return self.clean_text(self.extract_text_from_part(msg))
         return ""
+
 
     def get_letter_files(self, msg):
         mail = email.message_from_bytes(msg[0][1])
@@ -104,21 +110,34 @@ class Mail:
                     new_file.write(part.get_payload(decode=True))
                     new_file.close()
 
-    def return_all_unread_messages(self, sender=None):
+
+    def get_letter_files_from_id(self, id):
+
+        res, msg = self.imap.uid("fetch", str(id), "(RFC822)")
+        self.get_letter_files(msg)
+
+
+    def return_all_unread_messages(self, sender=None, change_not_from_sender=False):
         """
         Returns unread messages
         :param sender: target email
+        :param change_not_from_sender: mark emails not from the sender as read or not
         :return:
         """
         letters_massive = []
 
-        res, unseen_msg = self.imap.uid("search", "UNSEEN", "ALL")
+        if sender != None and not change_not_from_sender:
+            res, unseen_msg = self.imap.uid("search", "UNSEEN", "FROM " + sender)
+        else:
+            res, unseen_msg = self.imap.uid("search", "UNSEEN", "ALL")
         unseen_msg = unseen_msg[0].decode(email_constance.ENCODING).split(" ")
 
         if not unseen_msg[0]:
             return letters_massive
 
         for letter in unseen_msg:
+            res, msg = self.imap.fetch(letter, 'UID')
+
             res, msg = self.imap.uid("fetch", letter, "(RFC822)")
             if res != "OK":
                 continue
@@ -127,22 +146,19 @@ class Mail:
             msg_subj = self.from_subj_decode(msg["Subject"])
             msg_date = msg["Date"]
 
-            if msg["Message-ID"]:
-                msg_id = msg["Message-ID"].lstrip("<").rstrip(">")
-            else:
-                msg_id = msg["Received"]
+            msg_id = letter
 
             if msg["Return-path"]:
                 msg_from = msg["Return-path"].lstrip("<").rstrip(">")
             if not msg_from:
-                encoding = decode_header(msg["From"])[0][1]  # не проверено
+                encoding = decode_header(msg["From"])[0][1]
                 msg_from = (
                     decode_header(msg["From"])[1][0].decode(
                         encoding
                     ).replace("<", "").replace(">", "").replace(" ", "")
                 )
             letter_text = self.get_letter_text(msg)
-            if msg_from != sender and sender != None:
+            if msg_from != sender and sender != None and change_not_from_sender:
                 continue
 
             letters_massive.append(
